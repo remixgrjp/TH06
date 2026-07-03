@@ -302,15 +302,15 @@ public class App{
 		String accessSecret,
 		String accessToken,
 		String deviceId,
-		LocalDateTime dtFm,
-		LocalDateTime dtTo
+		LocalDateTime dtStart,
+		LocalDateTime dtEnd
 	)throws Exception{
 		String path= "/v2.0/cloud/thing/"
 		+ deviceId
 		+ "/report-logs?codes=va_temperature,va_humidity&end_time="
-		+ getEpochMS( dtTo )	//"1782831600000" 2026-07-01 00:00:00
-		+ "&size=20&start_time="
-		+ getEpochMS( dtFm )	//"1780239600000" 2026-06-01 00:00:00
+		+ getEpochMS( dtEnd )   // 1782831600000 / 2026-07-01 00:00:00
+		+ "&size=20&start_time="// descending DateTime limit 20
+		+ getEpochMS( dtStart ) // 1780239600000 / 2026-06-01 00:00:00
 		;
 		String json= callApi( clientId, accessSecret, accessToken, path );
 
@@ -363,21 +363,19 @@ public class App{
 		String CLIENT_ID    = "********************";
 		String ACCESS_SECRET= "********************************";
 		String DEVICE_ID    = "**********************";
-		LocalDateTime dtTo= LocalDateTime.now().truncatedTo( java.time.temporal.ChronoUnit.SECONDS );
-		LocalDateTime dtFm= dtTo.minusWeeks( 1 );
+		LocalDateTime dt= LocalDateTime.now().truncatedTo( java.time.temporal.ChronoUnit.SECONDS );
 		String accessToken;
 
 		br= new BufferedReader( new InputStreamReader( System.in ) );
 		while( true ){
-			System.out.println( "1: CLIENT_ID " + CLIENT_ID );
-			System.out.println( "2: ACCESS_SECRET " + ACCESS_SECRET );
-			System.out.println( "3: DEVICE_ID " + DEVICE_ID );
-			System.out.println( "4: Get Token, Get the status of a single device." );
-			System.out.println( "5: from " + dtFm.format( dtf ) + " (" + getEpochMS( dtFm ) + ")" );
-			System.out.println( "6: to   " + dtTo.format( dtf ) + " (" + getEpochMS( dtTo ) + ")" );
-			System.out.println( "7: Get Token, range data of device." );
-			System.out.println( "Q: quit" );
-			System.out.print( "> " );
+			System.out.print( "1: CLIENT_ID: " + CLIENT_ID
+			+ "\n2: ACCESS_SECRET: " + ACCESS_SECRET
+			+ "\n3: DEVICE_ID: " + DEVICE_ID
+			+ "\n4: Get Token, Get the status"
+			+ "\n5: past->start_time-> [end_time] ->now: " + dt.format( dtf ) + " (" + getEpochMS( dt ) + ")"
+			+ "\n6: Get Token, Get range of Log"
+			+ "\nQ: quit"
+			+ "\n> " );
 			String s= br.readLine().trim();
 			switch( s.toUpperCase() ){
 			  case "1":
@@ -399,15 +397,12 @@ public class App{
 				}
 				break;
 			  case "5":
-				dtFm= inputDateTime( dtFm );
+				dt= inputDateTime( dt );
 				break;
 			  case "6":
-				dtTo= inputDateTime( dtTo );
-				break;
-			  case "7":
 				try{
 					accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
-					TH06Logs j= getLogs( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID, dtFm, dtTo );
+					TH06Logs j= getLogs( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID, dt.minusWeeks( 1 ), dt );
 					for( HistoryValue i : j.listT )
 						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
 					for( HistoryValue i : j.listH )
