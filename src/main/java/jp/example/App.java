@@ -26,10 +26,17 @@ import javax.crypto.spec.SecretKeySpec;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;//for ResponseStatus
 
-class TokenResponse{
+class TuyaResponse{
+	boolean success;
+	long t;
+	String tid;
+//	each unique Response Class
+	Integer code;//成功時は存在しないので !int
+	String msg;
+}
+
+class ResponseToken extends TuyaResponse{
 	public Result result;
-	public boolean success;
-	public long t;
 
 	public static class Result{
 		public String access_token;
@@ -38,12 +45,19 @@ class TokenResponse{
 		public String uid;
 	}
 }
+class TH06Token{
+	String access_token;
 
-class ResponseStatus{
-	public List<Item> result;
-	public boolean success;
-	public long t;
-	public String tid;
+	TH06Token( ResponseToken r )throws Exception{
+		if( ! r.success ){
+			throw new RuntimeException( r.code + ":" + r.msg );
+		}
+		access_token= r.result.access_token;
+	}
+}
+
+class ResponseStatus extends TuyaResponse{
+	List<Item> result;
 }
 class Item{
 	public String code;
@@ -65,7 +79,7 @@ class TH06Status{
 
 	TH06Status( ResponseStatus r )throws Exception{
 		if( ! r.success ){
-			throw new RuntimeException( "Status取得失敗" );
+			throw new RuntimeException( r.code + ":" + r.msg );
 		}
 		for( Item i : r.result ){
 			switch( i.code ){
@@ -95,11 +109,8 @@ class TH06Status{
 	}
 }
 
-class ResponseLogs{
-	public Result result;
-	public boolean success;
-	public long t;
-	String tid;
+class ResponseLogs extends TuyaResponse{
+	Result result;
 }
 class Result{
 	String device_id;
@@ -128,6 +139,9 @@ class TH06Logs{
 	List<HistoryValue> listB= new ArrayList<>();
 
 	TH06Logs( ResponseLogs r ){
+		if( ! r.success ){
+			throw new RuntimeException( r.code + ":" + r.msg );
+		}
 		for( LogItem i : r.result.logs ){
 			try{
 				switch( i.code ){
@@ -263,12 +277,8 @@ public class App{
 		String json= callApiToken( clientId, accessSecret );
 
 		Gson gson= new Gson();
-		TokenResponse token= gson.fromJson( json, TokenResponse.class );
-		if( ! token.success ){
-			throw new RuntimeException( "Token取得失敗" );
-		}
-		myLog( "===access_token===\n%s\n===", token.result.access_token );
-		return token.result.access_token;
+		TH06Token o= new TH06Token( gson.fromJson( json, ResponseToken.class ) );
+		return o.access_token;
 	}
 
 	/* json Level Get Status */
@@ -380,9 +390,13 @@ public class App{
 				DEVICE_ID= inputString( DEVICE_ID );
 				break;
 			  case "4":
-				accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
-				TH06Status o= getStatus( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID );
-				System.out.println( o.toString() );
+				try{
+					accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
+					TH06Status o= getStatus( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID );
+					System.out.println( o.toString() );
+				}catch( RuntimeException e ){
+					System.out.println( "NG get status[" + e.getMessage() + "]" );
+				}
 				break;
 			  case "5":
 				dtFm= inputDateTime( dtFm );
@@ -391,12 +405,16 @@ public class App{
 				dtTo= inputDateTime( dtTo );
 				break;
 			  case "7":
-				accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
-				TH06Logs j= getLogs( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID, dtFm, dtTo );
-				for( HistoryValue i : j.listT )
-					System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
-				for( HistoryValue i : j.listH )
-					System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value );
+				try{
+					accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
+					TH06Logs j= getLogs( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID, dtFm, dtTo );
+					for( HistoryValue i : j.listT )
+						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
+					for( HistoryValue i : j.listH )
+						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value );
+				}catch( RuntimeException e ){
+					System.out.println( "NG get logs[" + e.getMessage() + "]" );
+				}
 				break;
 			  case "Q":
 				System.out.println( "bye." );
