@@ -14,9 +14,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;//for Logs
-import java.util.Collections;//for Logs
 import java.util.List;
-import java.util.TreeMap;//for Logs
 
 import java.net.URI;
 import java.net.http.*;
@@ -116,54 +114,38 @@ class LogItem{
 	String value;
 }
 
-class TH06Log{
+class HistoryValue{
 	long eventTime;
-	Double temperature;
-	Integer humidity;
+	int value;
+	HistoryValue( long l, String s )throws Exception{
+		eventTime= l;
+		value= Integer.parseInt( s );
+	}
 }
 class TH06Logs{
-	List<TH06Log> list= new ArrayList<>();
-//	TreeMap<Long, TH06Log> map= new TreeMap<>( Collections.reverseOrder() );
+	List<HistoryValue> listT= new ArrayList<>();
+	List<HistoryValue> listH= new ArrayList<>();
+	List<HistoryValue> listB= new ArrayList<>();
 
-	TH06Logs( ResponseLogs r )throws Exception{
-		TH06Log current= null;
-		for( LogItem item : r.result.logs ){
-			if( "va_temperature".equals( item.code) ){
-				current= new TH06Log();
-				current.eventTime= item.event_time;
-				current.temperature= Integer.parseInt(item.value) / 10.0;
-				list.add( current );
-			}else if( "va_humidity".equals( item.code ) ){
-				if( current != null ){
-					current.humidity= Integer.parseInt( item.value );
+	TH06Logs( ResponseLogs r ){
+		for( LogItem i : r.result.logs ){
+			try{
+				switch( i.code ){
+				  case "va_temperature"://*10
+					listT.add( new HistoryValue( i.event_time, i.value ) );
+					break;
+				  case "va_humidity"://%
+					listH.add( new HistoryValue( i.event_time, i.value ) );
+					break;
+				  case "battery_percentage"://%
+					listB.add( new HistoryValue( i.event_time, i.value ) );
+					break;
 				}
+			}catch( Exception e ){
+				System.out.println( "Skiped a data [" + i.value + "]." );
 			}
 		}
 	}
-//	TH06Logs( ResponseLogs r )throws Exception{
-//		if( ! r.success ){
-//			throw new RuntimeException( "Logs取得失敗" );
-//		}
-//		for( LogItem item : r.result.logs ){
-//			TH06Log log= map.computeIfAbsent(
-//				item.event_time,
-//				t ->{
-//					TH06Log x= new TH06Log();
-//					x.eventTime= t;
-//					return x;
-//				}
-//			);
-//			switch( item.code ){
-//			  case "va_temperature":
-//				log.temperature= Integer.parseInt( item.value ) / 10.0;
-//				break;
-//			  case "va_humidity":
-//				log.humidity= Integer.parseInt( item.value );
-//				break;
-//			}
-//		}
-//		list= new ArrayList<>( map.values() );
-//	}
 }
 
 public class App{
@@ -411,9 +393,10 @@ public class App{
 			  case "7":
 				accessToken= getAccessToken( CLIENT_ID, ACCESS_SECRET );
 				TH06Logs j= getLogs( CLIENT_ID, ACCESS_SECRET, accessToken, DEVICE_ID, dtFm, dtTo );
-				for( TH06Log i : j.list ){
-					System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.temperature + "," + i.humidity );
-				}
+				for( HistoryValue i : j.listT )
+					System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
+				for( HistoryValue i : j.listH )
+					System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value );
 				break;
 			  case "Q":
 				System.out.println( "bye." );
