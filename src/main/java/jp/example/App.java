@@ -13,6 +13,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 public class App{
 	static DateTimeFormatter dtf= DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm:00" );
@@ -42,10 +43,10 @@ public class App{
 		String s= br.readLine().trim();
 		if( ! s.isEmpty() ){
 			try{
-				if( 10 == s.length() ){//入力文字列年月日のみを日時へ変換
+				if( 10 == s.length() ){//YYYY-MM-DD -> YYYY-MM-DD 00:00:00
 					LocalDate date= LocalDate.parse( s );
 					ldt= date.atStartOfDay();
-				}else{//入力文字列年月日＋時刻を日時へ変換
+				}else{//YYYY-MM-DD HH:MM:SS
 					DateTimeFormatter formatter= DateTimeFormatter.ofPattern( "yyyy-MM-dd HH:mm" );
 					ldt= LocalDateTime.parse( s, formatter );
 				}
@@ -56,68 +57,82 @@ public class App{
 		return ldt;
 	}
 
+	static void printCSV( List<History> l, String s ){
+		System.out.println( s );//first line
+		for( History i : l ){
+			System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
+		}
+	}
+
 	public static void main( String[] args )throws Exception{
+		String ENDPOINT     = "https://openapi.tuyaus.com";
 		String CLIENT_ID    = "********************";
 		String ACCESS_SECRET= "********************************";
 		String DEVICE_ID    = "**********************";
 		LocalDateTime dt= LocalDateTime.now().truncatedTo( java.time.temporal.ChronoUnit.SECONDS );
 
 		br= new BufferedReader( new InputStreamReader( System.in ) );
+		TuyaClient client;
+		List<History> list;
 		while( true ){
-			System.out.print( "1: CLIENT_ID: " + CLIENT_ID
+			System.out.print( "0: URL: " + ENDPOINT
+			+ "\n1: CLIENT_ID: " + CLIENT_ID
 			+ "\n2: ACCESS_SECRET: " + ACCESS_SECRET
 			+ "\n3: DEVICE_ID: " + DEVICE_ID
-			+ "\n4: Get Token, Get the status"
+			+ "\n4: Get last status"
 			+ "\n5: past->start_time-> [end_time] ->now: " + dt.format( dtf ) + " (" + getEpochMS( dt ) + ")"
-			+ "\n6: Get Token, Get range of Log"
+			+ "\n6: Get log Temperature"
+			+ "\n7: Get log Humidity"
+			+ "\n8: Get log Battery"
 			+ "\nQ: quit"
 			+ "\n> " );
 			String s= br.readLine().trim();
-			switch( s.toUpperCase() ){
-			  case "1":
-				CLIENT_ID= inputString( CLIENT_ID );
-				break;
-			  case "2":
-				ACCESS_SECRET= inputString( ACCESS_SECRET );
-				break;
-			  case "3":
-				DEVICE_ID= inputString( DEVICE_ID );
-				break;
-			  case "4":
-				try{
-					TuyaClient c= new TuyaClient( CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
-					TH06Status o= c.getStatus();
+			try{
+				switch( s.toUpperCase() ){
+				  case "0":
+					ENDPOINT= inputString( ENDPOINT );
+					break;
+				  case "1":
+					CLIENT_ID= inputString( CLIENT_ID );
+					break;
+				  case "2":
+					ACCESS_SECRET= inputString( ACCESS_SECRET );
+					break;
+				  case "3":
+					DEVICE_ID= inputString( DEVICE_ID );
+					break;
+				  case "4":
+					client= new TuyaClient( ENDPOINT, CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
+					TH06Status o= client.getStatus();
 					System.out.println( o.toString() );
-				}catch( RuntimeException e ){
-					System.out.println( "NG get status[" + e.getMessage() + "]" );
+					break;
+				  case "5":
+					dt= inputDateTime( dt );
+					break;
+				  case "6":
+					client= new TuyaClient( ENDPOINT, CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
+					list= client.getLogsTemperature( dt.minusWeeks( 1 ), dt );
+					printCSV( list, "Time,DateTime,Temperature" );
+					break;
+				  case "7":
+					client= new TuyaClient( ENDPOINT, CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
+					list= client.getLogsHumidity( dt.minusWeeks( 1 ), dt );
+					printCSV( list, "Time,DateTime,Humidity" );
+					break;
+				  case "8":
+					client= new TuyaClient( ENDPOINT, CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
+					list= client.getLogsBattery( dt.minusWeeks( 1 ), dt );
+					printCSV( list, "Time,DateTime,Battery" );
+					break;
+				  case "Q":
+					System.out.println( "bye." );
+					System.exit( 0 );
+				  default:
+					System.out.println( "?" );
+					break;
 				}
-				break;
-			  case "5":
-				dt= inputDateTime( dt );
-				break;
-			  case "6":
-				try{
-					TuyaClient c= new TuyaClient( CLIENT_ID, ACCESS_SECRET, DEVICE_ID );
-					TH06Logs j= c.getLogs( dt.minusWeeks( 1 ), dt );
-					System.out.println( "Time,DateTime,temperature" );
-					for( HistoryValue i : j.listT )
-						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value/10.0 );
-					System.out.println( "Time,DateTime,humidity" );
-					for( HistoryValue i : j.listH )
-						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value );
-					System.out.println( "Time,DateTime,Battery" );
-					for( HistoryValue i : j.listB )
-						System.out.println( "" + i.eventTime + "," + getLocalDateTime( i.eventTime ).format( dtf ) + "," + i.value );
-				}catch( RuntimeException e ){
-					System.out.println( "NG get logs[" + e.getMessage() + "]" );
-				}
-				break;
-			  case "Q":
-				System.out.println( "bye." );
-				System.exit( 0 );
-			  default:
-				System.out.println( "?" );
-				break;
+			}catch( APIException e ){
+				System.out.println( e.getMessage() );
 			}
 			System.out.println();
 		}

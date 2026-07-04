@@ -17,6 +17,12 @@ import javax.crypto.spec.SecretKeySpec;
 import com.google.gson.Gson;
 import com.google.gson.JsonElement;//for ResponseStatus
 
+class APIException extends Exception{
+	public APIException( String message ){
+		super( String.format( "API Exception [%s]", message ) );
+	}
+}
+
 class TuyaResponse{
 	boolean success;
 	long t;
@@ -41,7 +47,7 @@ class TH06Token{
 
 	TH06Token( ResponseToken r )throws Exception{
 		if( ! r.success ){
-			throw new RuntimeException( r.code + ":" + r.msg );
+			throw new APIException( String.format( "Token %s:%s", r.code, r.msg ) );
 		}
 		access_token= r.result.access_token;
 	}
@@ -70,7 +76,7 @@ class TH06Status{
 
 	TH06Status( ResponseStatus r )throws Exception{
 		if( ! r.success ){
-			throw new RuntimeException( r.code + ":" + r.msg );
+			throw new APIException( String.format( "Status %s:%s", r.code, r.msg ) );
 		}
 		for( Item i : r.result ){
 			switch( i.code ){
@@ -116,34 +122,34 @@ class LogItem{
 	String value;
 }
 
-class HistoryValue{
+class History{
 	long eventTime;
 	int value;
-	HistoryValue( long l, String s )throws Exception{
+	History( long l, String s )throws Exception{
 		eventTime= l;
 		value= Integer.parseInt( s );
 	}
 }
 class TH06Logs{
-	List<HistoryValue> listT= new ArrayList<>();
-	List<HistoryValue> listH= new ArrayList<>();
-	List<HistoryValue> listB= new ArrayList<>();
+	List<History> listT= new ArrayList<>();
+	List<History> listH= new ArrayList<>();
+	List<History> listB= new ArrayList<>();
 
-	TH06Logs( ResponseLogs r ){
+	TH06Logs( ResponseLogs r )throws Exception{
 		if( ! r.success ){
-			throw new RuntimeException( r.code + ":" + r.msg );
+			throw new APIException( String.format( "Log %s:%s", r.code, r.msg ) );
 		}
 		for( LogItem i : r.result.logs ){
 			try{
 				switch( i.code ){
 				  case "va_temperature"://*10
-					listT.add( new HistoryValue( i.event_time, i.value ) );
+					listT.add( new History( i.event_time, i.value ) );
 					break;
 				  case "va_humidity"://%
-					listH.add( new HistoryValue( i.event_time, i.value ) );
+					listH.add( new History( i.event_time, i.value ) );
 					break;
 				  case "battery_percentage"://%
-					listB.add( new HistoryValue( i.event_time, i.value ) );
+					listB.add( new History( i.event_time, i.value ) );
 					break;
 				}
 			}catch( Exception e ){
@@ -154,12 +160,21 @@ class TH06Logs{
 }
 
 public class TuyaClient{
+	enum Code{
+		T( "va_temperature" ),
+		H( "va_humidity" ),
+		B( "battery_percentage" );
+		String v;
+		Code( String s ){ v= s; }
+	}
+	String EndPoint;//Data Center URL
 	String clientId;
 	String accessSecret;
 	String deviceId;
 	String accessToken;
 
-	TuyaClient( String s1, String s2, String s3 ){
+	TuyaClient( String s0, String s1, String s2, String s3 ){
+		EndPoint= s0;
 		clientId= s1;
 		accessSecret= s2;
 		deviceId= s3;
@@ -167,18 +182,32 @@ public class TuyaClient{
 
 	/* json Level Get Status */
 	TH06Status getStatus()throws Exception{
-		accessToken= getAccessToken( clientId, accessSecret );
-		return getStatus( clientId, accessSecret, accessToken, deviceId );
+		accessToken= getAccessToken( EndPoint, clientId, accessSecret );
+		return getStatus( EndPoint, clientId, accessSecret, accessToken, deviceId );
 	}
 
 	/* json Level Get Logs */
 	TH06Logs getLogs( LocalDateTime dtStart, LocalDateTime dtEnd )throws Exception{
-		accessToken= getAccessToken( clientId, accessSecret );
-		return getLogs( clientId, accessSecret, accessToken, deviceId, dtStart, dtEnd );
+		accessToken= getAccessToken( EndPoint, clientId, accessSecret );
+		String s= String.format( "%s,%s,%s", Code.T.v, Code.H.v, Code.B.v );
+		return getLogs( EndPoint, clientId, accessSecret, accessToken, deviceId, s, dtStart, dtEnd );
+	}
+	List<History> getLogsTemperature( LocalDateTime dtStart, LocalDateTime dtEnd )throws Exception{
+		accessToken= getAccessToken( EndPoint, clientId, accessSecret );
+		return getLogs( EndPoint, clientId, accessSecret, accessToken, deviceId, Code.T.v, dtStart, dtEnd ).listT;
+	}
+	List<History> getLogsHumidity( LocalDateTime dtStart, LocalDateTime dtEnd )throws Exception{
+		accessToken= getAccessToken( EndPoint, clientId, accessSecret );
+		return getLogs( EndPoint, clientId, accessSecret, accessToken, deviceId, Code.H.v, dtStart, dtEnd ).listH;
+	}
+	List<History> getLogsBattery( LocalDateTime dtStart, LocalDateTime dtEnd )throws Exception{
+		accessToken= getAccessToken( EndPoint, clientId, accessSecret );
+		return getLogs( EndPoint, clientId, accessSecret, accessToken, deviceId, Code.B.v, dtStart, dtEnd ).listB;
 	}
 
+	// debug off: java App 2>/dev/null
 	static void myLog( String s1, String s2 ){
-		System.out.println( String.format( s1, s2 ) );
+		System.err.println( String.format( s1, s2 ) );
 	}
 
 	/* LocalDateTime -> long */
@@ -218,6 +247,7 @@ public class TuyaClient{
 
 	/* Low Level API Get Token */
 	static String callApiToken(
+		String EndPoint,//"https://openapi.tuyaus.com"
 		String clientId,
 		String accessSecret
 	)throws Exception{
@@ -230,8 +260,9 @@ public class TuyaClient{
 		String t= String.valueOf( System.currentTimeMillis() );
 		String signStr= clientId + t + stringToSign;
 		String sign= hmacSha256( signStr, accessSecret );
+
 		HttpRequest req= HttpRequest.newBuilder()
-		.uri( new URI( "https://openapi.tuyaus.com"	+ path))
+		.uri( new URI( EndPoint	+ path ) )
 		.header( "client_id", clientId )
 		.header( "t", t)
 		.header( "sign_method", "HMAC-SHA256" )
@@ -258,6 +289,7 @@ public class TuyaClient{
 
 	/* Low Level API Get */
 	static String callApi(
+		String EndPoint,//"https://openapi.tuyaus.com"
 		String clientId,
 		String accessSecret,
 		String accessToken,
@@ -270,7 +302,7 @@ public class TuyaClient{
 		String sign= hmacSha256( signStr, accessSecret );
 
 		HttpRequest req= HttpRequest.newBuilder()
-		.uri( URI.create( "https://openapi.tuyaus.com" + path ) )
+		.uri( URI.create( EndPoint + path ) )
 		.header( "client_id", clientId )
 		.header( "access_token", accessToken )
 		.header( "t", t )
@@ -289,10 +321,11 @@ public class TuyaClient{
 
 	/* json Level Get AccessToken */
 	static String getAccessToken(
+		String EndPoint,//"https://openapi.tuyaus.com"
 		String clientId,
 		String accessSecret
 	)throws Exception{
-		String json= callApiToken( clientId, accessSecret );
+		String json= callApiToken( EndPoint, clientId, accessSecret );
 
 		Gson gson= new Gson();
 		TH06Token o= new TH06Token( gson.fromJson( json, ResponseToken.class ) );
@@ -301,13 +334,14 @@ public class TuyaClient{
 
 	/* json Level Get Status */
 	static TH06Status getStatus(
+		String EndPoint,//"https://openapi.tuyaus.com"
 		String clientId,
 		String accessSecret,
 		String accessToken,
 		String deviceId
 	)throws Exception{
 		String path= "/v1.0/iot-03/devices/" + deviceId + "/status";
-		String json= callApi( clientId, accessSecret, accessToken, path );
+		String json= callApi( EndPoint, clientId, accessSecret, accessToken, path );
 
 		Gson gson= new Gson();
 		TH06Status o= new TH06Status( gson.fromJson( json, ResponseStatus.class ) );
@@ -316,21 +350,25 @@ public class TuyaClient{
 
 	/* json Level Get Logs */
 	static TH06Logs getLogs(
+		String EndPoint,//"https://openapi.tuyaus.com"
 		String clientId,
 		String accessSecret,
 		String accessToken,
 		String deviceId,
+		String codes, //comma separated
 		LocalDateTime dtStart,
 		LocalDateTime dtEnd
 	)throws Exception{
 		String path= "/v2.0/cloud/thing/"
 		+ deviceId
-		+ "/report-logs?codes=va_temperature,va_humidity,battery_percentage&end_time="
+	//	+ "/report-logs?codes=va_temperature,va_humidity,battery_percentage&end_time="
+		+ "/report-logs?codes=" + codes
+		+ "&end_time="
 		+ getEpochMS( dtEnd )   // 1782831600000 / 2026-07-01 00:00:00
 		+ "&size=100&start_time="// descending DateTime limit 100
 		+ getEpochMS( dtStart ) // 1780239600000 / 2026-06-01 00:00:00
 		;
-		String json= callApi( clientId, accessSecret, accessToken, path );
+		String json= callApi( EndPoint, clientId, accessSecret, accessToken, path );
 
 		Gson gson= new Gson();
 		TH06Logs o= new TH06Logs( gson.fromJson( json, ResponseLogs.class ) );
