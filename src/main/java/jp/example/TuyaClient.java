@@ -134,8 +134,34 @@ class TH06Logs{
 	List<History> listT= new ArrayList<>();
 	List<History> listH= new ArrayList<>();
 	List<History> listB= new ArrayList<>();
+	ResponseLogs r;
 
 	TH06Logs( ResponseLogs r )throws Exception{
+		this.r= r;
+		if( ! r.success ){
+			throw new APIException( String.format( "Log %s:%s", r.code, r.msg ) );
+		}
+		for( LogItem i : r.result.logs ){
+			try{
+				switch( i.code ){
+				  case "va_temperature"://*10
+					listT.add( new History( i.event_time, i.value ) );
+					break;
+				  case "va_humidity"://%
+					listH.add( new History( i.event_time, i.value ) );
+					break;
+				  case "battery_percentage"://%
+					listB.add( new History( i.event_time, i.value ) );
+					break;
+				}
+			}catch( Exception e ){
+				System.out.println( "Skiped a data [" + i.value + "]." );
+			}
+		}
+	}
+
+	void add( ResponseLogs r )throws Exception{
+		this.r= r;
 		if( ! r.success ){
 			throw new APIException( String.format( "Log %s:%s", r.code, r.msg ) );
 		}
@@ -372,6 +398,26 @@ public class TuyaClient{
 
 		Gson gson= new Gson();
 		TH06Logs o= new TH06Logs( gson.fromJson( json, ResponseLogs.class ) );
+
+	//	if( o.r.result.has_more ){
+		while( o.r.result.has_more ){
+			myLog( "=== Next key ===\n%s\n===", o.r.result.last_row_key );
+
+			path= "/v2.0/cloud/thing/"
+			+ deviceId
+		//	+ "/report-logs?codes=va_temperature,va_humidity,battery_percentage&end_time="
+			+ "/report-logs?codes=" + codes
+			+ "&end_time="
+			+ getEpochMS( dtEnd )   // 1782831600000 / 2026-07-01 00:00:00
+			+ "&last_row_key=" + o.r.result.last_row_key
+			+ "&size=100&start_time="// descending DateTime limit 100
+			+ getEpochMS( dtStart ) // 1780239600000 / 2026-06-01 00:00:00
+			;
+			json= callApi( EndPoint, clientId, accessSecret, accessToken, path );
+
+			o.add( gson.fromJson( json, ResponseLogs.class ) );
+		}
+
 		return o;
 	}
 }
