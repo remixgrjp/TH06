@@ -38,13 +38,16 @@ activate "IoT Core".
 
 get "Access ID" (==Client ID).
 
-get "Access Secret".
+get "Access Secret" (==Client Secret).
 
 regist TH06 (scan QR by Android "SmartLife 7.8.4").
 
 get "Device ID".
 
-article https://note.com/remix_asia/n/n3fd2d5fa74d9
+### my article
+https://note.com/remix_asia/n/n3fd2d5fa74d9
+
+https://remix.asia/blog/remix/2026/03/tuya_th06_wifi.html
 
 ## Make, Run
 ```
@@ -52,6 +55,12 @@ git clone https://github.com/remixgrjp/TH06.git
 cd TH06
 mvn clean compile
 mvn exec:java -Dexec.mainClass=jp.example.App
+```
+single jar
+```
+mvn clean package assembly:single
+jar tvf target/Tuya-1.0-SNAPSHOT-jar-with-dependencies.jar
+java -jar target/Tuya-1.0-SNAPSHOT-jar-with-dependencies.jar
 ```
 
 ## Usage
