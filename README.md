@@ -32,7 +32,7 @@ regist email.
 
 add project.
 
-select Data Center == "End Point URL".
+select Data Center (== Endpoint URL).
 
 activate "IoT Core".
 
@@ -61,6 +61,12 @@ single jar
 mvn clean package assembly:single
 jar tvf target/Tuya-1.0-SNAPSHOT-jar-with-dependencies.jar
 java -jar target/Tuya-1.0-SNAPSHOT-jar-with-dependencies.jar
+```
+
+How to not use maven.
+```
+javac -cp lib/* -encoding utf-8 -d target/classes src/main/java/jp/example/*.java
+java -cp target/classes:lib/* jp.example.App
 ```
 
 ## Usage
