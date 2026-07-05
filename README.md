@@ -13,6 +13,9 @@ OpenJDK 64-Bit Server VM (Red_Hat-11.0.22.0.7-1) (build 11.0.22+7-LTS, mixed mod
 Apache Maven 3.9.6
 
 Tuya TH06 (WiFi Temperature/Humidity sensor)
+
+<a target="img" href="./README.jpg"><img src="./README.jpg"></a>
+
 ## Advance Preparation
 
 ### Android
@@ -33,7 +36,7 @@ select Data Center == "End Point URL".
 
 activate "IoT Core".
 
-get "Access ID".
+get "Access ID" (==Client ID).
 
 get "Access Secret".
 
@@ -41,7 +44,7 @@ regist TH06 (scan QR by Android "SmartLife 7.8.4").
 
 get "Device ID".
 
-article https://editor.note.com/notes/n3fd2d5fa74d9/
+article https://note.com/remix_asia/n/n3fd2d5fa74d9
 
 ## Make, Run
 ```
@@ -114,5 +117,3 @@ Q: quit
 1783093200381,2026-07-04 00:40:00,22.6
 1783091369684,2026-07-04 00:09:00,22.5
 ```
-## article
-https://note.com/remix_asia/n/n3fd2d5fa74d9
