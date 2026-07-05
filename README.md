@@ -65,7 +65,7 @@ java -jar target/Tuya-1.0-SNAPSHOT-jar-with-dependencies.jar
 
 How to not use maven.
 ```
-javac -cp lib/* -encoding utf-8 -d target/classes src/main/java/jp/example/*.java
+javac -cp lib/gson-2.14.0.jar -encoding utf-8 -d target/classes src/main/java/jp/example/*.java
 java -cp target/classes:lib/* jp.example.App
 ```
 
